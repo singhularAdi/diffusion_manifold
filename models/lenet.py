@@ -31,6 +31,7 @@ class LeNet(nn.Module):
 
 class LeNetPL(pl.LightningModule):
     def __init__(self, lenet):
+        super().__init__()
         self.lenet = lenet
         self.loss = nn.CrossEntropyLoss()
 
