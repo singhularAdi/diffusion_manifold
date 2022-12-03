@@ -2,13 +2,20 @@ from denoising_diffusion_pytorch.classifier_free_guidance import Unet, GaussianD
 import torchvision
 import torch
 from tqdm import tqdm
+import os
+import os.path as osp
 
+save_path = "./conditional_results"
+if not osp.exists(save_path):
+    os.mkdir(osp.join(save_path, "models"))
+    os.mkdir(osp.join(save_path, "results"))
+    
 model = Unet(
     dim = 64,
     dim_mults = (1, 2),
     num_classes=10,
     channels = 1,
-    cond_drop_prob = 0.5
+    cond_drop_prob = 0.1
 )
 
 diffusion = GaussianDiffusion(
@@ -26,7 +33,7 @@ transforms = torchvision.transforms.Compose(
 dataset = torchvision.datasets.MNIST("./mnist/", train=True, transform=transforms, download=True)
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=32, num_workers=2, shuffle=True)
 optimizer = torch.optim.Adam(model.parameters(), lr=8e-5)
-epochs = 10
+epochs = 50
 device = "cuda"
 
 for epoch in tqdm(range(epochs)):
@@ -41,7 +48,7 @@ for epoch in tqdm(range(epochs)):
     for i in range(10):
         condition = torch.tensor([i]).to(device)
         sampled_img = diffusion.sample(condition)
-        torchvision.utils.save_image(sampled_img, f"./conditional_results/sample-{epoch}-class={i}.jpg")
+        torchvision.utils.save_image(sampled_img, osp.join(save_path, "results", f"sample-{epoch}-class={i}.jpg"))
     if epoch % 5 == 0:
-        torch.save(model, f"diffusion_epoch={epoch + 1}")
+        torch.save(model, osp.join(save_path, "models", f"diffusion_epoch={epoch + 1}.pth"))
     
