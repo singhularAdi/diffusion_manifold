@@ -5,6 +5,7 @@ from torch.nn.functional import log_softmax
 from functorch import jacrev
 import matplotlib.pyplot as plt
 from tqdm import tqdm, trange
+from denoising_diffusion_pytorch import Unet, GaussianDiffusion
 
 from utils import get_data, project_subspace
 from models import LeNet, LeNetPL
@@ -15,7 +16,19 @@ def predict(model, x):
     return log_softmax(pred)
 
 
-def find_path(s, d, model, alpha=0.1, T=10000, save_path=False):
+def get_eigen(x, n_eigs=None):
+    if n_eigs:
+        eigvals, eigvecs = torch.lobpcg(x, k=n_eigs)
+        eigvals, eigvecs = eigvals.real, eigvecs.real
+    else:
+        # Columns are eigvecs, project on transpose
+        eigvals, eigvecs = torch.linalg.eig(x)
+        eigvals, eigvecs = eigvals.real, eigvecs.real
+    return eigvals, eigvecs
+
+
+def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
+              n_eigs=None, num_classes=10, update_steps=1000):
 
     x_hist = []
     x_t = s
@@ -30,21 +43,21 @@ def find_path(s, d, model, alpha=0.1, T=10000, save_path=False):
             j = jacrev(predict, argnums=1)(model.lenet, x_t.unsqueeze(0))
             j = j.squeeze()
 
-            # orthonomalize for projection
-            # j = gram_schmidt_orthogonalize(j)
+            if use_g:
+                g = j.view(num_classes, -1).T @ j.view(num_classes, -1)
+                eigvals, eigvecs = get_eigen(g, n_eigs)
 
-            # TODO check need for 10 * -1 shapes, does 10* 28* 28 make a difference?
-            # orthogonalize
-            j_orth, _ = torch.linalg.qr(j.view(j.shape[0], -1).T)
+                v = project_subspace(d - x_t, eigvecs.T)
+            else:
+                j_orth, _ = torch.linalg.qr(j.view(j.shape[0], -1).T)
 
-            # project d-x_t onto j
-            v = project_subspace(d - x_t, j_orth.T)
+                v = project_subspace(d - x_t, j_orth.T)
 
             # update
             x_t = x_t + alpha * (v.view(x_t.shape) / norm(v))
 
             # book keeping
-            if t % 1000 == 0:
+            if t % update_steps == 0:
                 probs = F.softmax(model.lenet(x_t.unsqueeze(0)))
                 idx = torch.argmax(probs)
                 norm_diff = norm(d - x_t)
@@ -59,19 +72,25 @@ def find_path(s, d, model, alpha=0.1, T=10000, save_path=False):
     plt.show()
 
 
-def main():
-    checkpoint_path = '/home/aditya/workspace/diffusion_manifold/lightning_logs/version_0/checkpoints/lmnist-epoch=20-val_loss=0.0303-val_acc=0.9914.ckpt'
-
-    # load dataset, get source image and destination image
+def gt_data():
     tdata, vdata = get_data()
     s, _ = tdata[3]
     d, _ = tdata[0]
+
+    return s, d
+
+
+def main():
+    checkpoint_path = '/home/aditya/workspace/diffusion_manifold/lightning_logs/version_0/checkpoints/lmnist-epoch=20-val_loss=0.0303-val_acc=0.9914.ckpt'
+
+    # get gt data
+    s, d = gt_data()
 
     # load model
     lenet = LeNet()
     model = LeNetPL(lenet)
     model.load_from_checkpoint(checkpoint_path, lenet=lenet)
-    find_path(s, d, model)
+    find_path(s, d, model, use_g=True, T=10000)
 
 
 if __name__ == '__main__':
