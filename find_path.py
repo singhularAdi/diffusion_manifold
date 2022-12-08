@@ -4,7 +4,7 @@ from torch.linalg import norm
 from torch.nn.functional import log_softmax
 from functorch import jacrev
 import matplotlib.pyplot as plt
-from tqdm import tqdm, trange
+from tqdm import trange
 from denoising_diffusion_pytorch import Unet, GaussianDiffusion
 
 from utils import get_data, project_subspace
@@ -24,13 +24,22 @@ def get_eigen(x, n_eigs=None):
         # Columns are eigvecs, project on transpose
         eigvals, eigvecs = torch.linalg.eig(x)
         eigvals, eigvecs = eigvals.real, eigvecs.real
+
+        # Uncomment this section to plot eigaenvalues vs idx
+        # sorted_vals, _ = eigvals.sort(descending=True)
+        # plt.semilogy([idx for idx in range(len(eigvals))], sorted_vals)
+        # plt.xlabel('idx (sorted)')
+        # plt.ylabel('eigenvalue')
+        # plt.savefig('./assets/g_eigval_plot.png')
+
     return eigvals, eigvecs
 
 
 def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
-              n_eigs=None, num_classes=10, update_steps=1000):
+              n_eigs=None, num_classes=10, log_steps=1000):
 
     x_hist = []
+    class_hist, prob_hist, it_hist = [], [], []
     x_t = s
 
     plt.imshow(x_t.view(28, 28).detach().cpu().numpy(), cmap='gray')
@@ -38,6 +47,7 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
     plt.imshow(d.view(28, 28).detach().cpu().numpy(), cmap='gray')
     plt.show()
 
+    import ipdb; ipdb.set_trace()
     with torch.no_grad(), trange(T, desc='Traversing') as pbar:
         for t in pbar:  # calculate jacobian of log_softmax wrt x_t
             j = jacrev(predict, argnums=1)(model.lenet, x_t.unsqueeze(0))
@@ -57,7 +67,7 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
             x_t = x_t + alpha * (v.view(x_t.shape) / norm(v))
 
             # book keeping
-            if t % update_steps == 0:
+            if t % log_steps == 0:
                 probs = F.softmax(model.lenet(x_t.unsqueeze(0)))
                 idx = torch.argmax(probs)
                 norm_diff = norm(d - x_t)
@@ -67,7 +77,17 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
 
                 if save_path:
                     x_hist.append(x_t.view(28, 28).detach().cpu().numpy())
+                    class_hist.append(idx.item())
+                    prob_hist.append(probs[0][idx].item())
+                    it_hist.append(t)
 
+    import ipdb; ipdb.set_trace()
+    if save_path:
+        fig, axs = plt.subplots(1, len(x_hist))
+        for idx in range(len(x_hist)):
+            axs[idx].imshow(x_hist[idx], cmap='gray')
+            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}')
+        fig.show()
     plt.imshow(x_t.view(28, 28).detach().cpu().numpy(), cmap='gray')
     plt.show()
 
@@ -75,6 +95,7 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
 def gt_data():
     tdata, vdata = get_data()
     s, _ = tdata[3]
+    import ipdb; ipdb.set_trace()
     d, _ = tdata[0]
 
     return s, d
@@ -90,7 +111,8 @@ def main():
     lenet = LeNet()
     model = LeNetPL(lenet)
     model.load_from_checkpoint(checkpoint_path, lenet=lenet)
-    find_path(s, d, model, use_g=True, T=10000)
+    # find_path(s, d, model, use_g=True, T=1000, log_steps=100, n_eigs=100)
+    find_path(s, d, model, alpha=0.01,  use_g=False, T=5000, log_steps=1000,  save_path=True)
 
 
 if __name__ == '__main__':
