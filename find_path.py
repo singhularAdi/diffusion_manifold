@@ -38,6 +38,7 @@ def get_eigen(x, n_eigs=None):
 def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
               n_eigs=None, num_classes=10, log_steps=1000):
 
+    r_hist = []
     x_hist = []
     class_hist, prob_hist, it_hist = [], [], []
     x_t = s
@@ -47,7 +48,6 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
     plt.imshow(d.view(28, 28).detach().cpu().numpy(), cmap='gray')
     plt.show()
 
-    import ipdb; ipdb.set_trace()
     with torch.no_grad(), trange(T, desc='Traversing') as pbar:
         for t in pbar:  # calculate jacobian of log_softmax wrt x_t
             j = jacrev(predict, argnums=1)(model.lenet, x_t.unsqueeze(0))
@@ -64,9 +64,11 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
                 v = project_subspace(d - x_t, j_orth.T)
 
             # update
-            x_t = x_t + alpha * (v.view(x_t.shape) / norm(v))
+            r_dist = alpha * (v.view(x_t.shape) / norm(v))
+            x_t = x_t + r_dist
 
             # book keeping
+            r_hist.append(norm(r_dist).detach().cpu().numpy())
             if t % log_steps == 0:
                 probs = F.softmax(model.lenet(x_t.unsqueeze(0)))
                 idx = torch.argmax(probs)
@@ -81,13 +83,14 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
                     prob_hist.append(probs[0][idx].item())
                     it_hist.append(t)
 
-    import ipdb; ipdb.set_trace()
     if save_path:
         fig, axs = plt.subplots(1, len(x_hist))
         for idx in range(len(x_hist)):
             axs[idx].imshow(x_hist[idx], cmap='gray')
-            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}')
+            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}', fontsize=4)
         fig.show()
+
+    import ipdb; ipdb.set_trace()
     plt.imshow(x_t.view(28, 28).detach().cpu().numpy(), cmap='gray')
     plt.show()
 
@@ -95,10 +98,19 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
 def gt_data():
     tdata, vdata = get_data()
     s, _ = tdata[3]
-    import ipdb; ipdb.set_trace()
-    d, _ = tdata[0]
+    #d, _ = tdata[0]
 
+    #s, _ = tdata[0]
+    d, _ = tdata[420]
+    import ipdb; ipdb.set_trace()
     return s, d
+
+
+def get_orthnorm_vec(span):
+    x = torch.randn(span.shape[1])
+    x_proj = project_subspace(x, span)
+    x = x - x_proj
+    return x / norm(x)
 
 
 def main():
@@ -111,8 +123,8 @@ def main():
     lenet = LeNet()
     model = LeNetPL(lenet)
     model.load_from_checkpoint(checkpoint_path, lenet=lenet)
-    # find_path(s, d, model, use_g=True, T=1000, log_steps=100, n_eigs=100)
-    find_path(s, d, model, alpha=0.01,  use_g=False, T=5000, log_steps=1000,  save_path=True)
+    #find_path(s, d, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)
+    find_path(s, d, model, alpha=0.1,  use_g=False, T=10000, log_steps=1000,  save_path=True)
 
 
 if __name__ == '__main__':
