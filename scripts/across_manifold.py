@@ -67,7 +67,8 @@ def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
         fig, axs = plt.subplots(1, len(x_hist))
         for idx in range(len(x_hist)):
             axs[idx].imshow(x_hist[idx], cmap='gray')
-            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}', fontsize=4)
+            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}', fontsize=6)
+            axs[idx].axis('off')
         fig.show()
 
     import ipdb; ipdb.set_trace()
