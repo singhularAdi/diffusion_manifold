@@ -16,7 +16,7 @@ def get_data():
     return trainset, testset
 
 
-def get_data2(args):
+def get_data2():
     transform = torchvision.transforms.Compose(
         [
             torchvision.transforms.Resize(64),
