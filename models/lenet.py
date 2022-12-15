@@ -52,10 +52,13 @@ class LeNetPL(pl.LightningModule):
         self.log("val_loss", loss)
         self.log("val_acc", accuracy(y_pred, y))
 
+    def training_epoch_end(self, outputs):
+        self.lr_schedulers().step()
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
-        return optimizer
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-4, weight_decay=1e-6)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=10, T_mult=2)
+        return [optimizer], [scheduler]
 
 
 if __name__ == '__main__':
