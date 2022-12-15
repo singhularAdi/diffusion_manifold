@@ -15,8 +15,8 @@ def predict(model, x):
     return log_softmax(pred)
 
 
-def find_path(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
-              n_eigs=None, num_classes=10, log_steps=1000):
+def find_path_on_manifold(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
+                             n_eigs=None, num_classes=10, log_steps=1000):
 
     r_hist = []
     x_hist = []

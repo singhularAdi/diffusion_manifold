@@ -1,2 +1,2 @@
-from .across_manifold import find_path
-from .between_manifolds import diffusion_traversal
+from .across_manifold import find_path_on_manifold
+from .between_manifolds import find_path_between_manifolds

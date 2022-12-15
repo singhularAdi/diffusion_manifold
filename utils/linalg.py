@@ -1,4 +1,5 @@
 import torch
+from torch.linalg import norm
 
 
 def project_on_one(x, y):
@@ -36,8 +37,8 @@ def get_eigen(x, n_eigs=None):
     return eigvals, eigvecs
 
 
-def get_orthnorm_vec(span):
-    x = torch.randn(span.shape[1])
+def get_orthnorm_vec(span, device='cpu'):
+    x = torch.randn(span.shape[1], device=device)
     x_proj = project_subspace(x, span)
     x = x - x_proj
     return x / norm(x)

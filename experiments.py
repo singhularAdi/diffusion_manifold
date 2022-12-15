@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 from denoising_diffusion_pytorch import Unet, GaussianDiffusion, Trainer
 from denoising_diffusion_pytorch.denoising_diffusion_pytorch import normalize_to_neg_one_to_one
 
-from scripts import find_path, find_path_across
+from scripts import find_path_on_manifold, find_path_between_manifolds
 from utils import get_data, get_data_diff, prep_img_for_classifier
-from models import LeNet, LeNetPL
+from models import LeNet, LeNetPL, UNet_conditional, Diffusion
 
 
 def imshow_torch(img, shape=(28, 28)):
@@ -17,58 +17,39 @@ def imshow_torch(img, shape=(28, 28)):
 
 def gt_data():
     tdata, vdata = get_data()
-    s, _ = tdata[3]
-    d, _ = tdata[0]
+    #s, _ = tdata[3]
+    #d, _ = tdata[0]
 
-    #s, _ = tdata[0]
-    #d, _ = tdata[420]
+    s, _ = tdata[0]
+    d, _ = tdata[420]
 
     tdatadiff, vdatadiff = get_data_diff()
 
-    s_diff, _ = tdatadiff[123]
+    s_diff, _ = tdatadiff[0]
     return s, d, s_diff
 
 
-def get_diffusion_unnoised(img, device='cuda', conditional=False):
+def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
     # Get model
+
+    model = UNet_conditional(c_in=1, c_out=1, num_classes=10).to(device)
+    model.load_state_dict(torch.load('lightning_logs/ema_ckpt_cond.pt'))
+    diffusion = Diffusion(img_size=64, device=device)
     import ipdb; ipdb.set_trace()
 
-    if not conditional:
+    img = img.to(device)
+    img = img.view(1, 1, 64, 64)
+    label = torch.tensor([label]).to(device)
+    t = torch.tensor([999]).to(device)
 
-#        model = Unet(
-#            dim = 64,
-#            dim_mults = (1, 2),
-#            #num_classes=10,
-#            channels = 1,
-#            #cond_drop_prob = 0.1
-#        )
-#
-#        diffusion = GaussianDiffusion(
-#            model,
-#            image_size = 64,
-#            timesteps = 1000,   # number of steps
-#        ).cuda()
-#        diffusion.load_state_dict(torch.load('./lightning_logs/ema_unconditional.pth'))
-        diffusion = torch.load('lightning_logs/diffusion-model.pt')
-        diffusion.to(device)
-    else:
-        ...
+    noised_img = diffusion.noise_images(img, t)
 
-    # Prep data
-    num_timesteps = 1000
-    norm_img = normalize_to_neg_one_to_one(img)
-    norm_img = norm_img.to(device)
-    noised_img = diffusion.q_sample(norm_img, t=torch.tensor([num_timesteps - 1], device=device)).view(1, 1, 64, 64)
-
-
-    for t in tqdm(reversed(range(0, num_timesteps)), desc='sampling loop ts', total=num_timesteps):
-        noised_img, x_start = diffusion.p_sample(noised_img, t, None)
-
+    sam = diffusion.sample(model, 1, label, x=noised_img[0], cfg_scale=0)
     import ipdb; ipdb.set_trace()
     img = prep_img_for_classifier(img)
-    diff_img = prep_img_for_classifier(noised_img)
+    diff_img = prep_img_for_classifier(sam[0]/255)
 
-    return img, diff_img
+    return img.view(1, 28, 28) , diff_img.view(1, 28, 28)
 
 
 
@@ -87,20 +68,20 @@ def main():
     model.load_from_checkpoint(checkpoint_path, lenet=lenet)
     model.to(device)
     # Natural Data
-    # find_path(s, d, model, use_g=True, T=1000, log_steps=100, save_path=True)  # norm_dis = 0.133, reim dist t = 1000
-    # find_path(s, d, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # n = 8.45, r_dis = 1000
-    # find_path(s, d, model, use_g=True, T=10000, log_steps=1000, n_eigs=10, save_path=True)  # n = 4.14, r_dis = 10000
-    # find_path(s, d, model, alpha=0.1,  use_g=False, T=10000, log_steps=1000,  save_path=True)  # norm dist= 10.5, reim dist trvelled = 10000
+    #find_path_on_manifold(s, d, model, use_g=True, T=1000, log_steps=100, save_path=True)  # norm_dis = 0.133, reim dist t = 1000
+    # find_path_on_manifold(s, d, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # n = 8.45, r_dis = 1000
+    # find_path_on_manifold(s, d, model, use_g=True, T=10000, log_steps=1000, n_eigs=10, save_path=True)  # n = 4.14, r_dis = 10000
+    # find_path_on_manifold(s, d, model, alpha=0.1,  use_g=False, T=10000, log_steps=1000,  save_path=True)  # norm dist= 10.5, reim dist trvelled = 10000
 
-    import ipdb; ipdb.set_trace()
-    s_diff, s_denoised = get_diffusion_unnoised(s_diff, device)
+    #find_path_on_manifold(s, d, model, alpha=0.1,  use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # norm dist= 10.5, reim dist trvelled = 10000
+
+    #s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device)
     # Diffusion Data
 
-    import ipdb; ipdb.set_trace()
-    find_path(s_diff, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # n = 8.45, r_dis = 1000
+    #find_path(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # n = 15.9, r_dis = 1000
 
     # Across traversal
-    find_path_across(model, diffusion, norm_s_diff, noised_s)
+    find_path_between_manifolds(model, s_diff)
 
 
 if __name__ == '__main__':
