@@ -90,7 +90,7 @@ def main():
     #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=100, save_path=True)  # n = 15.9, r_dis = 1000
     #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=None, save_path=True)  # n = 15.9, r_dis = 1000
     # Across traversal
-    find_path_between_manifolds(model, s_diff, diff_subset, use_local_g=True)
+    find_path_between_manifolds(model, s_diff, diff_subset, use_local=True, use_g=False)
 
 
 if __name__ == '__main__':
