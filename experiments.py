@@ -25,8 +25,16 @@ def gt_data():
 
     tdatadiff, vdatadiff = get_data_diff()
 
-    s_diff, _ = tdatadiff[0]
-    return s, d, s_diff
+    s_diff, lab_diff = tdatadiff[0]
+    diff_idxs = tdatadiff.targets == lab_diff
+    diff_idxs = torch.where(diff_idxs == True)[0]
+
+    diff_subset = torch.empty(len(diff_idxs), 64 * 64)
+
+    for idx, idx_data in tqdm(enumerate(diff_idxs)):
+        diff_subset[idx] = tdatadiff[idx_data][0].view(1, -1)
+
+    return s, d, s_diff, diff_subset
 
 
 def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
@@ -35,7 +43,6 @@ def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
     model = UNet_conditional(c_in=1, c_out=1, num_classes=10).to(device)
     model.load_state_dict(torch.load('lightning_logs/ema_ckpt_cond.pt'))
     diffusion = Diffusion(img_size=64, device=device)
-    import ipdb; ipdb.set_trace()
 
     img = img.to(device)
     img = img.view(1, 1, 64, 64)
@@ -45,11 +52,10 @@ def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
     noised_img = diffusion.noise_images(img, t)
 
     sam = diffusion.sample(model, 1, label, x=noised_img[0], cfg_scale=0)
-    import ipdb; ipdb.set_trace()
     img = prep_img_for_classifier(img)
     diff_img = prep_img_for_classifier(sam[0]/255)
 
-    return img.view(1, 28, 28) , diff_img.view(1, 28, 28)
+    return img.view(1, 28, 28), diff_img.view(1, 28, 28)
 
 
 
@@ -59,7 +65,7 @@ def main():
     checkpoint_path = '/home/aditya/workspace/diffusion_manifold/lightning_logs/version_0/checkpoints/lmnist-epoch=20-val_loss=0.0303-val_acc=0.9914.ckpt'
 
     # get gt data
-    s, d, s_diff = gt_data()
+    s, d, s_diff, diff_subset = gt_data()
     s, d, s_diff = s.to(device), d.to(device), s_diff.to(device)
 
     # load model
@@ -75,13 +81,16 @@ def main():
 
     #find_path_on_manifold(s, d, model, alpha=0.1,  use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # norm dist= 10.5, reim dist trvelled = 10000
 
-    #s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device)
+    s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device)
     # Diffusion Data
 
-    #find_path(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # n = 15.9, r_dis = 1000
+    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=False, T=10000, log_steps=1000, save_path=True)  # n = 15.9, r_dis = 1000
 
+    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=10000, log_steps=1000, n_eigs=10, save_path=True)  # n = 15.9, r_dis = 1000
+    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=100, save_path=True)  # n = 15.9, r_dis = 1000
+    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=None, save_path=True)  # n = 15.9, r_dis = 1000
     # Across traversal
-    find_path_between_manifolds(model, s_diff)
+    find_path_between_manifolds(model, s_diff, diff_subset, use_local_g=True)
 
 
 if __name__ == '__main__':

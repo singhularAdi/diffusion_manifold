@@ -16,7 +16,7 @@ def predict(model, x):
 
 
 def find_path_on_manifold(s, d, model, alpha=0.1, T=5000, use_g=False, save_path=False,
-                             n_eigs=None, num_classes=10, log_steps=1000):
+                             n_eigs=None, num_classes=10, log_steps=1000, name='fig'):
 
     r_hist = []
     x_hist = []
@@ -67,13 +67,13 @@ def find_path_on_manifold(s, d, model, alpha=0.1, T=5000, use_g=False, save_path
         fig, axs = plt.subplots(1, len(x_hist))
         for idx in range(len(x_hist)):
             axs[idx].imshow(x_hist[idx], cmap='gray')
-            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}', fontsize=6)
+            axs[idx].set_title(f'Iteration={it_hist[idx]} \n Label={class_hist[idx]} \n Prob={prob_hist[idx]:.3f}', fontsize=8)
             axs[idx].axis('off')
+        fig.savefig("test.png",bbox_inches='tight')
         fig.show()
 
-    import ipdb; ipdb.set_trace()
-    plt.imshow(x_t.view(28, 28).detach().cpu().numpy(), cmap='gray')
     plt.show()
+
 
 
 def gt_data():
