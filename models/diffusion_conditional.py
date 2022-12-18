@@ -11,6 +11,8 @@ from utils import prep_img_for_classifier
 import logging
 from torch.utils.tensorboard import SummaryWriter
 
+from utils import project_subspace
+
 logging.basicConfig(format="%(asctime)s - %(levelname)s: %(message)s", level=logging.INFO, datefmt="%I:%M:%S")
 
 
@@ -63,8 +65,10 @@ class   Diffusion:
         x = (x * 255).type(torch.uint8)
         return x
 
-    def sample_across(self, model, n, labels, g_perp, x=None, cfg_scale=3):
+    def sample_across(self, model, n, labels, g_perp, x=None, cfg_scale=3, j=None):
         dist_hist = []
+        hor_dist = []
+        x_orig = prep_img_for_classifier(copy.deepcopy(x)).view(-1)
         model.eval()
         with torch.no_grad():
             if x == None:
@@ -85,21 +89,30 @@ class   Diffusion:
                     noise = torch.zeros_like(x)
                 x = 1 / torch.sqrt(alpha) * (x - ((1 - alpha) / (torch.sqrt(1 - alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
 
-                x_noisy_new = (x.clamp(-1, 1) + 1) / 2
+                #x_noisy_new = (x.clamp(-1, 1) + 1) / 2
+                x_noisy_new = x / (x.view(-1).max() - x.view(-1).min())
+
                 x_noisy_old = prep_img_for_classifier(x_noisy_old)
                 x_noisy_new = prep_img_for_classifier(x_noisy_new)
                 delta_x = x_noisy_new - x_noisy_old
                 perp_dist = torch.dot(g_perp, delta_x.view(-1))
+                g_perp_v = g_perp * perp_dist
+                hor_dist.append(
+                    project_subspace(delta_x.view(-1) - g_perp_v, j.T)
+                )
 
                 dist_hist.append(perp_dist.item())
 
-
-
-
-
         model.train()
+
+        tot_hor = torch.stack(hor_dist)
+        tot_hor = tot_hor.sum(axis=0)
+        tot_hor_dist = torch.linalg.norm(tot_hor)
+
         x = (x.clamp(-1, 1) + 1) / 2
         x = (x * 255).type(torch.uint8)
+
+        print(f'Distance travelled on manifold = {tot_hor_dist}')
         return x, dist_hist
 
 def train(args):

@@ -34,7 +34,7 @@ def _compute_g_perp(x_orig, model, num_classes, n_eigs, device, use_g):
     g_perp = get_orthnorm_vec(eigvecs.T, device=device)
     g_perp = g_perp.to(device)
 
-    return g_perp
+    return g_perp, eigvecs
 
 
 def _compute_g_perp_avg(x_subset, closest_idxs, model, num_classes, n_eigs, device, use_g):
@@ -60,7 +60,7 @@ def _compute_g_perp_avg(x_subset, closest_idxs, model, num_classes, n_eigs, devi
 
     g_perp = g_perp.to(device)
 
-    return g_perp
+    return g_perp, eigvecs
 
 
 def compute_g_perp(
@@ -69,7 +69,7 @@ def compute_g_perp(
 
     dim = x_orig.shape[1]
     if not use_local:
-        g_perp = _compute_g_perp(x_orig, model, num_classes, n_eigs, device, use_g)
+        g_perp, eigvecs = _compute_g_perp(x_orig, model, num_classes, n_eigs, device, use_g)
 
     elif use_local:
         x_subset = x_subset.cpu()
@@ -80,11 +80,10 @@ def compute_g_perp(
 
         x_orig = x_orig.to(device)
         x_subset = x_subset.to(device)
-        g_perp = _compute_g_perp_avg(x_subset, closest_idxs, model, num_classes,
+        g_perp, eigvecs = _compute_g_perp_avg(x_subset, closest_idxs, model, num_classes,
                                       n_eigs, device, use_g)
 
-
-    return g_perp
+    return g_perp, eigvecs
 
 
 def find_path_between_manifolds(
@@ -97,7 +96,7 @@ def find_path_between_manifolds(
     diffusion = Diffusion(img_size=64, device=device)
     dist_hist = []
 
-    g_perp = compute_g_perp(x_orig, x_subset, model, num_classes, n_eigs, device,
+    g_perp, eigvecs = compute_g_perp(x_orig, x_subset, model, num_classes, n_eigs, device,
                                 use_local, use_g)
 
     x_orig = x_orig.to(device)
@@ -107,7 +106,7 @@ def find_path_between_manifolds(
 
     noised_img = diffusion.noise_images(x_orig, t)
 
-    sam, dist_hist= diffusion.sample_across(dif_backbone, 1, label, g_perp, x=noised_img[0], cfg_scale=0)
+    sam, dist_hist= diffusion.sample_across(dif_backbone, 1, label, g_perp, x=noised_img[0], cfg_scale=0, j=eigvecs)
 
     plt.plot([[idx] for idx in range(len(dist_hist))], dist_hist)
     plt.xlabel('Diffusion timestep')

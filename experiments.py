@@ -37,7 +37,7 @@ def gt_data():
     return s, d, s_diff, diff_subset
 
 
-def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
+def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False, ret_sam=False):
     # Get model
 
     model = UNet_conditional(c_in=1, c_out=1, num_classes=10).to(device)
@@ -51,11 +51,15 @@ def get_diffusion_unnoised(img, label=5, device='cuda', conditional=False):
 
     noised_img = diffusion.noise_images(img, t)
 
-    sam = diffusion.sample(model, 1, label, x=noised_img[0], cfg_scale=0)
+    if ret_sam == True:
+        sam = diffusion.sample(model, 1, label, x=noised_img[0], cfg_scale=0)
+        diff_img = prep_img_for_classifier(sam[0]/255)
+        diff_img = diff_img.view(1, 28, 28)
+    else:
+        diff_img = None
     img = prep_img_for_classifier(img)
-    diff_img = prep_img_for_classifier(sam[0]/255)
 
-    return img.view(1, 28, 28), diff_img.view(1, 28, 28)
+    return img.view(1, 28, 28), diff_img
 
 
 
@@ -81,15 +85,16 @@ def main():
 
     #find_path_on_manifold(s, d, model, alpha=0.1,  use_g=True, T=1000, log_steps=100, n_eigs=50, save_path=True)  # norm dist= 10.5, reim dist trvelled = 10000
 
-    s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device)
+    # s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device, ret_sam=True)
     # Diffusion Data
 
-    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=False, T=10000, log_steps=1000, save_path=True)  # n = 15.9, r_dis = 1000
+    # find_path_on_manifold(s_diff_r, s_denoised, model, use_g=False, T=10000, log_steps=1000, save_path=True)  # n = 15.9, r_dis = 1000
 
-    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=10000, log_steps=1000, n_eigs=10, save_path=True)  # n = 15.9, r_dis = 1000
-    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=100, save_path=True)  # n = 15.9, r_dis = 1000
-    #find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=None, save_path=True)  # n = 15.9, r_dis = 1000
+    # find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=10000, log_steps=1000, n_eigs=10, save_path=True)  # n = 15.9, r_dis = 1000
+    # find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=100, save_path=True)  # n = 15.9, r_dis = 1000
+    # find_path_on_manifold(s_diff_r, s_denoised, model, use_g=True, T=1000, log_steps=100, n_eigs=None, save_path=True)  # n = 15.9, r_dis = 1000
     # Across traversal
+    s_diff_r, s_denoised = get_diffusion_unnoised(s_diff, device=device, ret_sam=False)
     find_path_between_manifolds(model, s_diff, diff_subset, use_local=True, use_g=False)
 
 
